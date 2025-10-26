@@ -6,7 +6,20 @@ A minimal cross-platform CLI that knows what’s running — list, inspect, and 
 
 `knows` helps you discover which local processes are listening on specific ports, inspect their details, and terminate them when necessary. It supports macOS, Linux, and Windows by shelling out to familiar system tools (`lsof` or `netstat`) and enriches results so you can see the command behind each listening port. An interactive mode lets you pick ports and processes with arrow keys before choosing to inspect or kill them.
 
-## Install & run with pnpm
+<p align="center">
+<img src="./docs/splash-01.png" alt="splash image" width="80%" />
+</p>
+
+## Quickstart
+
+Install globally using npm, then run the CLI:
+
+```bash
+npm i -g knows
+knows list
+```
+
+Or run it locally without installing globally:
 
 ```bash
 pnpm install
@@ -21,6 +34,10 @@ After linking, the `knows` command is available globally. Alternatively, run it 
 pnpm exec knows list
 ```
 
+<p align="center">
+<img src="./docs/splash-02.png" alt="splash image" width="80%" />
+</p>
+
 ## Example commands
 
 - `knows list` – list all listening processes.
@@ -31,4 +48,4 @@ pnpm exec knows list
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is distributed under the terms of the existing LICENSE file in the repository.
