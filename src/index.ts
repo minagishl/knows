@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { Command } from 'commander';
-import inquirer from 'inquirer';
+import { Command } from 'commander'
+import inquirer from 'inquirer'
 import {
   filterByPort,
   formatProcess,
@@ -8,31 +8,31 @@ import {
   killByPort,
   listListeningProcesses,
   PortProcess,
-} from './processManager';
+} from './processManager'
 
-const program = new Command();
+const program = new Command()
 
 program
   .name('knows')
   .description('List, inspect, and kill local processes by port number.')
-  .version('0.1.0');
+  .version('0.1.0')
 
 function toPort(value: string): number {
-  const port = Number.parseInt(value, 10);
+  const port = Number.parseInt(value, 10)
   if (!Number.isFinite(port) || port <= 0 || port > 65535) {
-    throw new Error(`Invalid port: ${value}`);
+    throw new Error(`Invalid port: ${value}`)
   }
-  return port;
+  return port
 }
 
 function printProcesses(processes: PortProcess[]): void {
   if (processes.length === 0) {
-    console.log('No matching listening processes found.');
-    return;
+    console.log('No matching listening processes found.')
+    return
   }
   processes.forEach((item) => {
-    console.log(formatProcess(item));
-  });
+    console.log(formatProcess(item))
+  })
 }
 
 program
@@ -45,27 +45,27 @@ program
     try {
       const processes = options.port
         ? await filterByPort(options.port)
-        : await listListeningProcesses();
-      printProcesses(processes);
+        : await listListeningProcesses()
+      printProcesses(processes)
     } catch (error) {
-      console.error((error as Error).message);
-      process.exitCode = 1;
+      console.error((error as Error).message)
+      process.exitCode = 1
     }
-  });
+  })
 
 program
   .command('inspect <port>')
   .description('Inspect all listening processes on a specific port.')
   .action(async (portValue: string) => {
     try {
-      const port = toPort(portValue);
-      const matches = await filterByPort(port);
-      printProcesses(matches);
+      const port = toPort(portValue)
+      const matches = await filterByPort(port)
+      printProcesses(matches)
     } catch (error) {
-      console.error((error as Error).message);
-      process.exitCode = 1;
+      console.error((error as Error).message)
+      process.exitCode = 1
     }
-  });
+  })
 
 program
   .command('kill <port>')
@@ -76,44 +76,44 @@ program
   )
   .action(async (portValue: string, options: { force?: boolean }) => {
     try {
-      const port = toPort(portValue);
-      const { success, failed } = await killByPort(port);
+      const port = toPort(portValue)
+      const { success, failed } = await killByPort(port)
 
       success.forEach((item) => {
-        console.log(`Terminated ${formatProcess(item)}`);
-      });
+        console.log(`Terminated ${formatProcess(item)}`)
+      })
       failed.forEach(({ process: proc, error }) => {
         console.error(
           `Failed to terminate ${formatProcess(proc)} -> ${error.message}`
-        );
-      });
+        )
+      })
 
       if (failed.length > 0 && options.force) {
-        process.exitCode = 1;
+        process.exitCode = 1
       }
     } catch (error) {
-      console.error((error as Error).message);
-      process.exitCode = 1;
+      console.error((error as Error).message)
+      process.exitCode = 1
     }
-  });
+  })
 
 program
   .command('interactive')
   .description('Interactive mode to inspect or kill processes with arrow keys.')
   .action(async () => {
     try {
-      const processes = await listListeningProcesses();
+      const processes = await listListeningProcesses()
       if (processes.length === 0) {
-        console.log('No listening processes found.');
-        return;
+        console.log('No listening processes found.')
+        return
       }
 
-      const portMap = new Map<number, PortProcess[]>();
+      const portMap = new Map<number, PortProcess[]>()
       processes.forEach((processInfo) => {
-        const list = portMap.get(processInfo.port) ?? [];
-        list.push(processInfo);
-        portMap.set(processInfo.port, list);
-      });
+        const list = portMap.get(processInfo.port) ?? []
+        list.push(processInfo)
+        portMap.set(processInfo.port, list)
+      })
 
       const { selectedPort } = await inquirer.prompt<{ selectedPort: number }>([
         {
@@ -123,16 +123,14 @@ program
           choices: Array.from(portMap.keys())
             .sort((a, b) => a - b)
             .map((port) => ({
-              name: `Port ${port} (${
-                portMap.get(port)?.length ?? 0
-              } listener(s))`,
+              name: `Port ${port} (${portMap.get(port)?.length ?? 0} listener(s))`,
               value: port,
             })),
           pageSize: 10,
         },
-      ]);
+      ])
 
-      const matches = portMap.get(selectedPort) ?? [];
+      const matches = portMap.get(selectedPort) ?? []
       const { selectedPid } = await inquirer.prompt<{ selectedPid: number }>([
         {
           type: 'list',
@@ -144,12 +142,12 @@ program
           })),
           pageSize: 10,
         },
-      ]);
+      ])
 
-      const target = matches.find((item) => item.pid === selectedPid);
+      const target = matches.find((item) => item.pid === selectedPid)
       if (!target) {
-        console.error('Unable to resolve the selected process.');
-        return;
+        console.error('Unable to resolve the selected process.')
+        return
       }
 
       const { action } = await inquirer.prompt<{ action: 'inspect' | 'kill' }>([
@@ -162,34 +160,32 @@ program
             { name: 'Kill', value: 'kill' },
           ],
         },
-      ]);
+      ])
 
       if (action === 'inspect') {
-        console.log(formatProcess(target));
+        console.log(formatProcess(target))
       } else {
         try {
-          await killByPid(target.pid);
-          console.log(`Terminated ${formatProcess(target)}`);
+          await killByPid(target.pid)
+          console.log(`Terminated ${formatProcess(target)}`)
         } catch (error) {
           console.error(
-            `Failed to terminate ${formatProcess(target)} -> ${
-              (error as Error).message
-            }`
-          );
-          process.exitCode = 1;
+            `Failed to terminate ${formatProcess(target)} -> ${(error as Error).message}`
+          )
+          process.exitCode = 1
         }
       }
     } catch (error) {
-      console.error((error as Error).message);
-      process.exitCode = 1;
+      console.error((error as Error).message)
+      process.exitCode = 1
     }
-  });
+  })
 
 async function run(): Promise<void> {
-  await program.parseAsync(process.argv);
+  await program.parseAsync(process.argv)
 }
 
 run().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+  console.error(error instanceof Error ? error.message : error)
+  process.exit(1)
+})
