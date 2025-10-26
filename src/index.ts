@@ -15,7 +15,7 @@ const program = new Command()
 program
   .name('knows')
   .description('List, inspect, and kill local processes by port number.')
-  .version('0.1.0')
+  .version('1.0.0')
 
 function toPort(value: string): number {
   const port = Number.parseInt(value, 10)
