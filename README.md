@@ -48,4 +48,4 @@ pnpm exec knows list
 
 ## License
 
-This project is distributed under the terms of the existing LICENSE file in the repository.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
