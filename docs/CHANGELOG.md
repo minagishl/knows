@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2025-10-26
+
+### Changed
+
+- Filled in npm package metadata (author, repository, homepage, bugs URL) so consumers see the correct project links.
+
+### Fixed
+
+- Updated the publish workflow to run `pnpm install` after removing a typo in the `--frozen-lockfile` flag that broke automated releases.
+
 ## [1.0.0] - 2025-10-26
 
 ### Added
@@ -12,4 +22,5 @@ All notable changes to this project will be documented in this file.
 - Documented installation, usage examples, and screenshots in `README.md`, plus supplied MIT license text and community issue template.
 - Introduced project tooling and automation including Prettier formatting, `.editorconfig`, and a GitHub publish workflow.
 
+[1.0.1]: https://www.npmjs.com/package/knows/v/1.0.1
 [1.0.0]: https://www.npmjs.com/package/knows/v/1.0.0
