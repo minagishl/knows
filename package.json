@@ -1,39 +1,39 @@
 {
-	"name": "knows",
-	"version": "0.1.0",
-	"description": "A minimal cross-platform CLI that knows what’s running — list, inspect, and kill processes easily.",
-	"bin": {
-		"knows": "./dist/index.js"
-	},
-	"files": [
-		"dist",
-		"LICENSE",
-		"README.md"
-	],
-	"scripts": {
-		"build": "tsc -p tsconfig.json",
-		"dev": "ts-node src/index.ts"
-	},
-	"keywords": [
-		"cli",
-		"process",
-		"ports",
-		"utility"
-	],
-	"author": "",
-	"license": "MIT",
-	"engines": {
-		"node": ">=18.0.0"
-	},
-	"dependencies": {
-		"commander": "^11.0.0",
-		"find-process": "^1.4.7",
-		"inquirer": "^9.2.10"
-	},
-	"devDependencies": {
-		"@types/inquirer": "^9.0.9",
-		"@types/node": "^20.10.0",
-		"ts-node": "^10.9.2",
-		"typescript": "^5.4.0"
-	}
+  "name": "knows",
+  "version": "0.1.0",
+  "description": "A minimal cross-platform CLI that knows what’s running — list, inspect, and kill processes easily.",
+  "bin": {
+    "knows": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "ts-node src/index.ts"
+  },
+  "keywords": [
+    "cli",
+    "process",
+    "ports",
+    "utility"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "commander": "^11.0.0",
+    "find-process": "^1.4.7",
+    "inquirer": "^9.2.10"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.9",
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0"
+  }
 }
