@@ -11,7 +11,7 @@ const program = new Command()
 program
   .name('knows')
   .description('List, inspect, and kill local processes by port number.')
-  .version('1.0.0')
+  .version('1.1.0')
 
 registerListCommand(program)
 registerInspectCommand(program)
