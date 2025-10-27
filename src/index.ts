@@ -16,6 +16,8 @@ interface PortRange {
   max: number
 }
 
+type OutputFormat = 'text' | 'json' | 'csv'
+
 const program = new Command()
 
 program
@@ -55,7 +57,47 @@ function toPortRange(value: string): PortRange {
   return { min, max }
 }
 
-function printProcesses(processes: PortProcess[]): void {
+function toFormat(value: string): OutputFormat {
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'text' || normalized === 'json' || normalized === 'csv') {
+    return normalized
+  }
+  throw new Error(
+    `Invalid format: ${value}. Expected one of text, json, or csv.`
+  )
+}
+
+function printProcesses(
+  processes: PortProcess[],
+  format: OutputFormat = 'text'
+): void {
+  if (format === 'json') {
+    console.log(JSON.stringify(processes, null, 2))
+    return
+  }
+
+  if (format === 'csv') {
+    const header = 'protocol,port,pid,address,command'
+    const escapeCsv = (input: string | number | undefined): string => {
+      const value = input === undefined ? '' : String(input)
+      if (/[",\n]/.test(value)) {
+        return `"${value.replace(/"/g, '""')}"`
+      }
+      return value
+    }
+    const rows = processes.map((item) =>
+      [
+        escapeCsv(item.protocol),
+        escapeCsv(item.port),
+        escapeCsv(item.pid),
+        escapeCsv(item.address),
+        escapeCsv(item.command ?? ''),
+      ].join(',')
+    )
+    console.log([header, ...rows].join('\n'))
+    return
+  }
+
   if (processes.length === 0) {
     console.log('No matching listening processes found.')
     return
@@ -76,40 +118,61 @@ program
     'Filter by an inclusive port range (example: 3000-3999)',
     (value) => toPortRange(value)
   )
-  .action(async (options: { port?: number; portRange?: PortRange }) => {
-    try {
-      const { port, portRange } = options
-      if (port !== undefined && portRange !== undefined) {
-        throw new Error('Use either --port or --port-range, not both.')
+  .option('-f, --format <format>', 'Output format (text, json, csv)', (value) =>
+    toFormat(value)
+  )
+  .action(
+    async (options: {
+      port?: number
+      portRange?: PortRange
+      format?: OutputFormat
+    }) => {
+      try {
+        const { port, portRange } = options
+        if (port !== undefined && portRange !== undefined) {
+          throw new Error('Use either --port or --port-range, not both.')
+        }
+        let processes: PortProcess[]
+        if (port !== undefined) {
+          processes = await filterByPort(port)
+        } else if (portRange !== undefined) {
+          processes = await filterByPortRange(portRange.min, portRange.max)
+        } else {
+          processes = await listListeningProcesses()
+        }
+        const format = options.format ?? 'text'
+        printProcesses(processes, format)
+      } catch (error) {
+        console.error((error as Error).message)
+        process.exitCode = 1
       }
-      let processes: PortProcess[]
-      if (port !== undefined) {
-        processes = await filterByPort(port)
-      } else if (portRange !== undefined) {
-        processes = await filterByPortRange(portRange.min, portRange.max)
-      } else {
-        processes = await listListeningProcesses()
-      }
-      printProcesses(processes)
-    } catch (error) {
-      console.error((error as Error).message)
-      process.exitCode = 1
     }
-  })
+  )
 
 program
   .command('inspect <port>')
   .description('Inspect all listening processes on a specific port.')
-  .action(async (portValue: string) => {
-    try {
-      const port = toPort(portValue)
-      const matches = await filterByPort(port)
-      printProcesses(matches)
-    } catch (error) {
-      console.error((error as Error).message)
-      process.exitCode = 1
+  .option('-f, --format <format>', 'Output format (text, json, csv)', (value) =>
+    toFormat(value)
+  )
+  .action(
+    async (
+      portValue: string,
+      options: {
+        format?: OutputFormat
+      }
+    ) => {
+      try {
+        const port = toPort(portValue)
+        const matches = await filterByPort(port)
+        const format = options.format ?? 'text'
+        printProcesses(matches, format)
+      } catch (error) {
+        console.error((error as Error).message)
+        process.exitCode = 1
+      }
     }
-  })
+  )
 
 program
   .command('kill <port>')
