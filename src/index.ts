@@ -25,6 +25,14 @@ function toPort(value: string): number {
   return port
 }
 
+function toInterval(value: string): number {
+  const interval = Number.parseInt(value, 10)
+  if (!Number.isFinite(interval) || interval <= 0) {
+    throw new Error(`Invalid interval (ms): ${value}`)
+  }
+  return interval
+}
+
 function printProcesses(processes: PortProcess[]): void {
   if (processes.length === 0) {
     console.log('No matching listening processes found.')
@@ -95,6 +103,125 @@ program
       console.error((error as Error).message)
       process.exitCode = 1
     }
+  })
+
+program
+  .command('watch')
+  .description(
+    'Continuously monitor listening processes until Ctrl+C or Ctrl+Q is pressed.'
+  )
+  .option('-p, --port <port>', 'Filter by port number', (value) =>
+    toPort(value)
+  )
+  .option(
+    '-i, --interval <ms>',
+    'Refresh interval in milliseconds (default: 2000)',
+    (value) => toInterval(value)
+  )
+  .action(async (options: { port?: number; interval?: number }) => {
+    const refreshInterval = options.interval ?? 2000
+    if (!process.stdout.isTTY || !process.stdin.isTTY) {
+      console.error('Watch mode requires an interactive TTY.')
+      process.exitCode = 1
+      return
+    }
+
+    let stopped = false
+    const seenKeys = new Set<string>()
+    const stdin = process.stdin
+
+    function makeKey(proc: PortProcess): string {
+      return `${proc.protocol}:${proc.port}:${proc.pid}`
+    }
+
+    function stopWatching(): void {
+      if (stopped) {
+        return
+      }
+      stopped = true
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+      if (stdin.isTTY) {
+        stdin.setRawMode(false)
+        stdin.pause()
+        stdin.removeListener('data', onData)
+      }
+      console.log('\nWatch stopped.')
+    }
+
+    async function fetchProcesses(): Promise<PortProcess[]> {
+      return options.port
+        ? await filterByPort(options.port)
+        : await listListeningProcesses()
+    }
+
+    async function renderOnce(): Promise<void> {
+      try {
+        const processes = await fetchProcesses()
+        const currentKeys = new Set<string>()
+
+        process.stdout.write('\x1Bc')
+        const timestamp = new Date().toLocaleTimeString()
+        console.log(
+          `Watching listening processes @ ${timestamp} (refresh ${refreshInterval} ms)`
+        )
+        console.log('Press Ctrl+C or Ctrl+Q to exit.\n')
+
+        if (processes.length === 0) {
+          console.log('No matching listening processes found.')
+        } else {
+          processes.forEach((proc) => {
+            const key = makeKey(proc)
+            currentKeys.add(key)
+            const isNew = !seenKeys.has(key)
+            const prefix = isNew ? '+' : ' '
+            console.log(`${prefix} ${formatProcess(proc)}`)
+          })
+        }
+
+        seenKeys.clear()
+        currentKeys.forEach((key) => {
+          seenKeys.add(key)
+        })
+      } catch (error) {
+        console.error((error as Error).message)
+      }
+    }
+
+    let pending = false
+    let timer: NodeJS.Timeout | null = null
+
+    const onData = (buffer: Buffer): void => {
+      const byte = buffer[0]
+      if (byte === 3 || byte === 17) {
+        stopWatching()
+      }
+    }
+
+    async function schedule(): Promise<void> {
+      if (stopped) {
+        return
+      }
+      if (pending) {
+        return
+      }
+      pending = true
+      await renderOnce()
+      pending = false
+      if (!stopped) {
+        timer = setTimeout(schedule, refreshInterval)
+      }
+    }
+
+    if (stdin.isTTY) {
+      stdin.setRawMode(true)
+      stdin.resume()
+      stdin.on('data', onData)
+    }
+
+    await schedule()
   })
 
 program

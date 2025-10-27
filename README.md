@@ -44,6 +44,7 @@ pnpm exec knows list
 - `knows list --port 3000` – filter to port 3000.
 - `knows inspect 8080` – inspect port 8080.
 - `knows kill 5000` – terminate every listener on port 5000 (returns non-zero when `--force` is supplied and a process could not be killed).
+- `knows watch` – monitor listening processes in real time (press `Ctrl+C` or `Ctrl+Q` to exit). Use `--port` to focus on a specific port or `--interval` to adjust the refresh rate.
 - `knows interactive` – launch interactive mode with arrow-key navigation across ports and processes.
 
 ## License
