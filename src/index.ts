@@ -194,14 +194,44 @@ program
 
 program
   .command('kill <port>')
-  .description('Kill every process listening on the specified port.')
+  .description(
+    'Kill every process listening on the specified port (with confirmation).'
+  )
   .option(
     '-f, --force',
-    'Exit with non-zero status if any process fails to terminate'
+    'Skip confirmation and terminate matching processes immediately'
   )
   .action(async (portValue: string, options: { force?: boolean }) => {
     try {
       const port = toPort(portValue)
+      const matches = await filterByPort(port)
+
+      if (matches.length === 0) {
+        console.log(`No listening processes found on port ${port}.`)
+        return
+      }
+
+      if (!options.force) {
+        console.log('The following processes will be terminated:')
+        matches.forEach((item) => {
+          console.log(` - ${formatProcess(item)}`)
+        })
+
+        const { confirmed } = await inquirer.prompt<{ confirmed: boolean }>([
+          {
+            type: 'confirm',
+            name: 'confirmed',
+            message: `Proceed with terminating ${matches.length} process(es) on port ${port}?`,
+            default: false,
+          },
+        ])
+
+        if (!confirmed) {
+          console.log('Termination aborted.')
+          return
+        }
+      }
+
       const { success, failed } = await killByPort(port)
 
       success.forEach((item) => {
@@ -213,7 +243,7 @@ program
         )
       })
 
-      if (failed.length > 0 && options.force) {
+      if (failed.length > 0) {
         process.exitCode = 1
       }
     } catch (error) {
