@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { writeFile } from 'node:fs/promises'
 import { Command } from 'commander'
 import inquirer from 'inquirer'
 import {
@@ -67,13 +68,12 @@ function toFormat(value: string): OutputFormat {
   )
 }
 
-function printProcesses(
+function renderProcesses(
   processes: PortProcess[],
   format: OutputFormat = 'text'
-): void {
+): string {
   if (format === 'json') {
-    console.log(JSON.stringify(processes, null, 2))
-    return
+    return JSON.stringify(processes, null, 2)
   }
 
   if (format === 'csv') {
@@ -94,17 +94,31 @@ function printProcesses(
         escapeCsv(item.command ?? ''),
       ].join(',')
     )
-    console.log([header, ...rows].join('\n'))
-    return
+    return [header, ...rows].join('\n')
   }
 
   if (processes.length === 0) {
-    console.log('No matching listening processes found.')
+    return 'No matching listening processes found.'
+  }
+
+  return processes.map((item) => formatProcess(item)).join('\n')
+}
+
+async function outputProcesses(
+  processes: PortProcess[],
+  format: OutputFormat = 'text',
+  destination?: string
+): Promise<void> {
+  const content = renderProcesses(processes, format)
+
+  if (destination) {
+    const finalContent = content.endsWith('\n') ? content : `${content}\n`
+    await writeFile(destination, finalContent, { encoding: 'utf8' })
+    console.log(`Saved output to ${destination}`)
     return
   }
-  processes.forEach((item) => {
-    console.log(formatProcess(item))
-  })
+
+  console.log(content)
 }
 
 program
@@ -121,11 +135,13 @@ program
   .option('-f, --format <format>', 'Output format (text, json, csv)', (value) =>
     toFormat(value)
   )
+  .option('-o, --output <file>', 'Write output to the specified file')
   .action(
     async (options: {
       port?: number
       portRange?: PortRange
       format?: OutputFormat
+      output?: string
     }) => {
       try {
         const { port, portRange } = options
@@ -141,7 +157,7 @@ program
           processes = await listListeningProcesses()
         }
         const format = options.format ?? 'text'
-        printProcesses(processes, format)
+        await outputProcesses(processes, format, options.output)
       } catch (error) {
         console.error((error as Error).message)
         process.exitCode = 1
@@ -155,18 +171,20 @@ program
   .option('-f, --format <format>', 'Output format (text, json, csv)', (value) =>
     toFormat(value)
   )
+  .option('-o, --output <file>', 'Write output to the specified file')
   .action(
     async (
       portValue: string,
       options: {
         format?: OutputFormat
+        output?: string
       }
     ) => {
       try {
         const port = toPort(portValue)
         const matches = await filterByPort(port)
         const format = options.format ?? 'text'
-        printProcesses(matches, format)
+        await outputProcesses(matches, format, options.output)
       } catch (error) {
         console.error((error as Error).message)
         process.exitCode = 1
