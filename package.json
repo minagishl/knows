@@ -14,7 +14,8 @@
     "build": "node scripts/build.mjs",
     "build:tsc": "tsc -p tsconfig.json",
     "dev": "ts-node src/index.ts",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "cli",
