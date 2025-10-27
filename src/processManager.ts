@@ -192,6 +192,19 @@ export async function filterByPort(port: number): Promise<PortProcess[]> {
   return processes.filter((item) => item.port === port)
 }
 
+export async function filterByPortRange(
+  minPort: number,
+  maxPort: number
+): Promise<PortProcess[]> {
+  if (minPort > maxPort) {
+    return []
+  }
+  const processes = await listListeningProcesses()
+  return processes.filter(
+    (item) => item.port >= minPort && item.port <= maxPort
+  )
+}
+
 async function terminateProcess(pid: number): Promise<void> {
   if (process.platform === 'win32') {
     await execAsync(`taskkill /PID ${pid} /T /F`)

@@ -3,12 +3,18 @@ import { Command } from 'commander'
 import inquirer from 'inquirer'
 import {
   filterByPort,
+  filterByPortRange,
   formatProcess,
   killByPid,
   killByPort,
   listListeningProcesses,
   PortProcess,
 } from './processManager'
+
+interface PortRange {
+  min: number
+  max: number
+}
 
 const program = new Command()
 
@@ -33,6 +39,22 @@ function toInterval(value: string): number {
   return interval
 }
 
+function toPortRange(value: string): PortRange {
+  const trimmed = value.trim()
+  const match = trimmed.match(/^(\d+)\s*-\s*(\d+)$/)
+  if (!match) {
+    throw new Error(`Invalid port range: ${value}. Expected format start-end.`)
+  }
+  const min = toPort(match[1])
+  const max = toPort(match[2])
+  if (min > max) {
+    throw new Error(
+      `Invalid port range: start ${min} is greater than end ${max}.`
+    )
+  }
+  return { min, max }
+}
+
 function printProcesses(processes: PortProcess[]): void {
   if (processes.length === 0) {
     console.log('No matching listening processes found.')
@@ -49,11 +71,25 @@ program
   .option('-p, --port <port>', 'Filter by port number', (value) =>
     toPort(value)
   )
-  .action(async (options: { port?: number }) => {
+  .option(
+    '--port-range <start-end>',
+    'Filter by an inclusive port range (example: 3000-3999)',
+    (value) => toPortRange(value)
+  )
+  .action(async (options: { port?: number; portRange?: PortRange }) => {
     try {
-      const processes = options.port
-        ? await filterByPort(options.port)
-        : await listListeningProcesses()
+      const { port, portRange } = options
+      if (port !== undefined && portRange !== undefined) {
+        throw new Error('Use either --port or --port-range, not both.')
+      }
+      let processes: PortProcess[]
+      if (port !== undefined) {
+        processes = await filterByPort(port)
+      } else if (portRange !== undefined) {
+        processes = await filterByPortRange(portRange.min, portRange.max)
+      } else {
+        processes = await listListeningProcesses()
+      }
       printProcesses(processes)
     } catch (error) {
       console.error((error as Error).message)
@@ -114,115 +150,136 @@ program
     toPort(value)
   )
   .option(
+    '--port-range <start-end>',
+    'Filter by an inclusive port range (example: 3000-3999)',
+    (value) => toPortRange(value)
+  )
+  .option(
     '-i, --interval <ms>',
     'Refresh interval in milliseconds (default: 2000)',
     (value) => toInterval(value)
   )
-  .action(async (options: { port?: number; interval?: number }) => {
-    const refreshInterval = options.interval ?? 2000
-    if (!process.stdout.isTTY || !process.stdin.isTTY) {
-      console.error('Watch mode requires an interactive TTY.')
-      process.exitCode = 1
-      return
-    }
-
-    let stopped = false
-    const seenKeys = new Set<string>()
-    const stdin = process.stdin
-
-    function makeKey(proc: PortProcess): string {
-      return `${proc.protocol}:${proc.port}:${proc.pid}`
-    }
-
-    function stopWatching(): void {
-      if (stopped) {
+  .action(
+    async (options: {
+      port?: number
+      portRange?: PortRange
+      interval?: number
+    }) => {
+      if (options.port !== undefined && options.portRange !== undefined) {
+        console.error('Use either --port or --port-range, not both.')
+        process.exitCode = 1
         return
       }
-      stopped = true
-      if (timer) {
-        clearTimeout(timer)
-        timer = null
+      const refreshInterval = options.interval ?? 2000
+      if (!process.stdout.isTTY || !process.stdin.isTTY) {
+        console.error('Watch mode requires an interactive TTY.')
+        process.exitCode = 1
+        return
       }
-      if (stdin.isTTY) {
-        stdin.setRawMode(false)
-        stdin.pause()
-        stdin.removeListener('data', onData)
+
+      let stopped = false
+      const seenKeys = new Set<string>()
+      const stdin = process.stdin
+
+      function makeKey(proc: PortProcess): string {
+        return `${proc.protocol}:${proc.port}:${proc.pid}`
       }
-      console.log('\nWatch stopped.')
-    }
 
-    async function fetchProcesses(): Promise<PortProcess[]> {
-      return options.port
-        ? await filterByPort(options.port)
-        : await listListeningProcesses()
-    }
-
-    async function renderOnce(): Promise<void> {
-      try {
-        const processes = await fetchProcesses()
-        const currentKeys = new Set<string>()
-
-        process.stdout.write('\x1Bc')
-        const timestamp = new Date().toLocaleTimeString()
-        console.log(
-          `Watching listening processes @ ${timestamp} (refresh ${refreshInterval} ms)`
-        )
-        console.log('Press Ctrl+C or Ctrl+Q to exit.\n')
-
-        if (processes.length === 0) {
-          console.log('No matching listening processes found.')
-        } else {
-          processes.forEach((proc) => {
-            const key = makeKey(proc)
-            currentKeys.add(key)
-            const isNew = !seenKeys.has(key)
-            const prefix = isNew ? '+' : ' '
-            console.log(`${prefix} ${formatProcess(proc)}`)
-          })
+      function stopWatching(): void {
+        if (stopped) {
+          return
         }
-
-        seenKeys.clear()
-        currentKeys.forEach((key) => {
-          seenKeys.add(key)
-        })
-      } catch (error) {
-        console.error((error as Error).message)
+        stopped = true
+        if (timer) {
+          clearTimeout(timer)
+          timer = null
+        }
+        if (stdin.isTTY) {
+          stdin.setRawMode(false)
+          stdin.pause()
+          stdin.removeListener('data', onData)
+        }
+        console.log('\nWatch stopped.')
       }
+
+      async function fetchProcesses(): Promise<PortProcess[]> {
+        if (options.port !== undefined) {
+          return await filterByPort(options.port)
+        }
+        if (options.portRange !== undefined) {
+          const { min, max } = options.portRange
+          return await filterByPortRange(min, max)
+        }
+        return await listListeningProcesses()
+      }
+
+      async function renderOnce(): Promise<void> {
+        try {
+          const processes = await fetchProcesses()
+          const currentKeys = new Set<string>()
+
+          process.stdout.write('\x1Bc')
+          const timestamp = new Date().toLocaleTimeString()
+          console.log(
+            `Watching listening processes @ ${timestamp} (refresh ${refreshInterval} ms)`
+          )
+          console.log('Press Ctrl+C or Ctrl+Q to exit.\n')
+
+          if (processes.length === 0) {
+            console.log('No matching listening processes found.')
+          } else {
+            processes.forEach((proc) => {
+              const key = makeKey(proc)
+              currentKeys.add(key)
+              const isNew = !seenKeys.has(key)
+              const prefix = isNew ? '+' : ' '
+              console.log(`${prefix} ${formatProcess(proc)}`)
+            })
+          }
+
+          seenKeys.clear()
+          currentKeys.forEach((key) => {
+            seenKeys.add(key)
+          })
+        } catch (error) {
+          console.error((error as Error).message)
+        }
+      }
+
+      let pending = false
+      let timer: NodeJS.Timeout | null = null
+
+      const onData = (buffer: Buffer): void => {
+        const byte = buffer[0]
+        if (byte === 3 || byte === 17) {
+          stopWatching()
+        }
+      }
+
+      async function schedule(): Promise<void> {
+        if (stopped) {
+          return
+        }
+        if (pending) {
+          return
+        }
+        pending = true
+        await renderOnce()
+        pending = false
+        if (!stopped) {
+          timer = setTimeout(schedule, refreshInterval)
+        }
+      }
+
+      if (stdin.isTTY) {
+        stdin.setRawMode(true)
+        stdin.resume()
+        stdin.on('data', onData)
+      }
+
+      await schedule()
     }
-
-    let pending = false
-    let timer: NodeJS.Timeout | null = null
-
-    const onData = (buffer: Buffer): void => {
-      const byte = buffer[0]
-      if (byte === 3 || byte === 17) {
-        stopWatching()
-      }
-    }
-
-    async function schedule(): Promise<void> {
-      if (stopped) {
-        return
-      }
-      if (pending) {
-        return
-      }
-      pending = true
-      await renderOnce()
-      pending = false
-      if (!stopped) {
-        timer = setTimeout(schedule, refreshInterval)
-      }
-    }
-
-    if (stdin.isTTY) {
-      stdin.setRawMode(true)
-      stdin.resume()
-      stdin.on('data', onData)
-    }
-
-    await schedule()
-  })
+  )
 
 program
   .command('interactive')
