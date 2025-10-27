@@ -11,7 +11,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/build.mjs",
+    "build:tsc": "tsc -p tsconfig.json",
     "dev": "ts-node src/index.ts",
     "format": "prettier --write ."
   },
@@ -42,6 +43,7 @@
   "devDependencies": {
     "@types/inquirer": "^9.0.9",
     "@types/node": "^20.10.0",
+    "esbuild": "^0.25.11",
     "prettier": "^3.6.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.0"
